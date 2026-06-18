@@ -39,28 +39,34 @@ m = folium.Map(
 
 for _, row in df.iterrows():
     if pd.notna(row["lat"]) and pd.notna(row["lon"]):
-        stop_ahead_icon_html = """
-<div style="
-    font-size: 28px;
-    transform: translate(-50%, -50%);
-">
-    ⚠️
-</div>
-"""
+        for _, row in df.iterrows():
+    if pd.isna(row["lat"]) or pd.isna(row["lon"]):
+        continue
 
-icon = folium.DivIcon(
-    html=stop_ahead_icon_html,
-    icon_size=(30, 30),
-    icon_anchor=(15, 15)
-)
+    lat = float(row["lat"])
+    lon = float(row["lon"])
 
-folium.Marker(
-    [row["lat"], row["lon"]],
-    popup=row["name"],
-    tooltip=row["name"],
-    icon=icon
-).add_to(m)
+    stop_ahead_icon_html = """
+    <div style="
+        font-size: 28px;
+        transform: translate(-50%, -50%);
+    ">
+        ⚠️
+    </div>
+    """
 
+    icon = folium.DivIcon(
+        html=stop_ahead_icon_html,
+        icon_size=(30, 30),
+        icon_anchor=(15, 15)
+    )
+
+    folium.Marker(
+        [lat, lon],
+        popup=str(row["name"]),
+        tooltip=str(row["name"]),
+        icon=icon
+    ).add_to(m)
 st_folium(m, width=1200, height=700)
 
 st.subheader("Database")
