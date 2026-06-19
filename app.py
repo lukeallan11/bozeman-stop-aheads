@@ -5,11 +5,7 @@ from streamlit_folium import st_folium
 import re
 import gpxpy
 from geopy.distance import geodesic
-import streamlit as st
-import pandas as pd
-import folium
 import xml.etree.ElementTree as ET
-from io import BytesIO
 
 st.set_page_config(layout="wide")
 
@@ -117,6 +113,40 @@ def find_nearby_signs(df_signs, route_points, max_distance_m):
     return pd.DataFrame(matches).sort_values("distance_along_route_km")
 
 
+def make_waypoints_gpx(matched_df):
+    gpx = ET.Element(
+        "gpx",
+        version="1.1",
+        creator="Bozeman Stop Aheads"
+    )
+
+    for _, row in matched_df.iterrows():
+        wpt = ET.SubElement(
+            gpx,
+            "wpt",
+            lat=str(row["lat"]),
+            lon=str(row["lon"])
+        )
+
+        name = ET.SubElement(wpt, "name")
+        name.text = str(row["name"])
+
+        desc = ET.SubElement(wpt, "desc")
+        desc.text = (
+            f"Stop Ahead - {row['distance_along_route_km']} km / "
+            f"{row['distance_along_route_mi']} mi"
+        )
+
+        symbol = ET.SubElement(wpt, "sym")
+        symbol.text = "Flag"
+
+    return ET.tostring(
+        gpx,
+        encoding="utf-8",
+        xml_declaration=True
+    )
+
+
 @st.cache_data(ttl=60)
 def load_signs():
     df = pd.read_csv(SHEET_URL)
@@ -185,7 +215,9 @@ if uploaded_gpx is not None:
 
         for _, row in matched_df.iterrows():
             st.sidebar.write(
-                f"**{row['name']}** — {row['distance_along_route_km']} km / {row['distance_along_route_mi']} mi"
+                f"**{row['name']}** — "
+                f"{row['distance_along_route_km']} km / "
+                f"{row['distance_along_route_mi']} mi"
             )
 
 if route_points:
@@ -247,43 +279,20 @@ st_folium(m, width=1200, height=700)
 
 if uploaded_gpx is not None:
     st.subheader("Upcoming Stop Aheads on Route")
+    st.write(f"Matched signs found: {len(matched_df)}")
 
     if matched_df.empty:
         st.info("No stop aheads matched this route. Try increasing the match distance.")
     else:
         st.dataframe(matched_df)
 
-        gpx = ET.Element(
-            "gpx",
-            version="1.1",
-            creator="Bozeman Stop Aheads"
-        )
-
-        for _, row in matched_df.iterrows():
-            wpt = ET.SubElement(
-                gpx,
-                "wpt",
-                lat=str(row["lat"]),
-                lon=str(row["lon"])
-            )
-
-            name = ET.SubElement(wpt, "name")
-            name.text = str(row["name"])
-
-            desc = ET.SubElement(wpt, "desc")
-            desc.text = f"Stop Ahead - {row['distance_along_route_km']} km / {row['distance_along_route_mi']} mi"
-
-        xml_bytes = ET.tostring(
-            gpx,
-            encoding="utf-8",
-            xml_declaration=True
-        )
+        waypoints_gpx = make_waypoints_gpx(matched_df)
 
         st.download_button(
             label="Download Garmin Waypoints GPX",
-            data=xml_bytes,
+            data=waypoints_gpx,
             file_name="stop_aheads_waypoints.gpx",
-            mime="application/gpx+xml"
+            mime="application/gpx+xml",
         )
 
 st.subheader("Full Stop Ahead Database")
