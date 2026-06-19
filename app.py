@@ -10,7 +10,7 @@ st.set_page_config(layout="wide")
 
 st.title("Bozeman Stop Aheads")
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDDqZ0Qu0WLj0va46qBEvMQvh39mCNHf8q2QU1U52cl1sgMP-ugF_PokPcrNfks5KsEOGW8Hx4yRS/pubhtml"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDDqZ0Qu0WLj0va46qBEvMQvh39mCNHf8q2QU1U52cl1sgMP-ugF_PokPcrNfks5KsEOGW8Hx4yRS/pub?output=csv"
 
 MAX_DISTANCE_METERS_DEFAULT = 50
 
@@ -18,15 +18,27 @@ MAX_DISTANCE_METERS_DEFAULT = 50
 def extract_lat_lon(url):
     url = str(url)
 
-    match = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    match = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", url)
     if match:
         return float(match.group(1)), float(match.group(2))
 
-    match = re.search(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    match = re.search(r"[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)", url)
     if match:
         return float(match.group(1)), float(match.group(2))
 
     return None, None
+
+
+def clean_column_names(df):
+    df = df.copy()
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace("-", "_")
+    )
+    return df
 
 
 def parse_gpx(uploaded_file):
@@ -86,25 +98,38 @@ def find_nearby_signs(df_signs, route_points, max_distance_m):
                 "distance_along_route_mi": round(distance_along_m / 1609.344, 2),
             })
 
+    if not matches:
+        return pd.DataFrame(columns=[
+            "name",
+            "sign_type",
+            "lat",
+            "lon",
+            "distance_to_route_m",
+            "distance_along_route_km",
+            "distance_along_route_mi",
+        ])
+
     return pd.DataFrame(matches).sort_values("distance_along_route_km")
 
 
 @st.cache_data(ttl=60)
 def load_signs():
-    df = pd.read_csv(SHEET_URL, engine="python", on_bad_lines="skip")
+    df = pd.read_csv(SHEET_URL)
+    df = clean_column_names(df)
 
-	st.write("Columns found:")
-	st.write(df.columns.tolist())
+    if "google_maps_url" in df.columns and "maps_url" not in df.columns:
+        df = df.rename(columns={"google_maps_url": "maps_url"})
 
-	st.write("First few rows:")
-	st.dataframe(df.head())
+    if "map_url" in df.columns and "maps_url" not in df.columns:
+        df = df.rename(columns={"map_url": "maps_url"})
 
-    if "maps_url" not in df.columns:
-        st.error("Your Google Sheet must have a column named maps_url.")
-        st.stop()
+    required_columns = ["name", "maps_url"]
 
-    if "name" not in df.columns:
-        st.error("Your Google Sheet must have a column named name.")
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        st.error(f"Missing required column(s): {missing}")
+        st.write("Columns found in your Google Sheet:")
+        st.write(df.columns.tolist())
         st.stop()
 
     if "sign_type" not in df.columns:
@@ -123,6 +148,7 @@ def load_signs():
 df_valid = load_signs()
 
 st.sidebar.header("Route Matching")
+
 uploaded_gpx = st.sidebar.file_uploader("Upload GPX route", type=["gpx"])
 
 max_distance_m = st.sidebar.slider(
@@ -130,7 +156,7 @@ max_distance_m = st.sidebar.slider(
     min_value=10,
     max_value=150,
     value=MAX_DISTANCE_METERS_DEFAULT,
-    step=10
+    step=10,
 )
 
 st.sidebar.metric("Known stop aheads", len(df_valid))
@@ -170,7 +196,7 @@ if route_points:
     folium.PolyLine(
         route_points,
         weight=5,
-        tooltip="Uploaded route"
+        tooltip="Uploaded route",
     ).add_to(m)
 
 stop_ahead_icon_html = """
@@ -188,7 +214,7 @@ for _, row in df_valid.iterrows():
     icon = folium.DivIcon(
         html=stop_ahead_icon_html,
         icon_size=(30, 30),
-        icon_anchor=(15, 15)
+        icon_anchor=(15, 15),
     )
 
     is_matched = row["name"] in matched_names
@@ -209,7 +235,7 @@ for _, row in df_valid.iterrows():
         [row["lat"], row["lon"]],
         popup=popup,
         tooltip=str(row.get("name", "Unnamed sign")),
-        icon=icon
+        icon=icon,
     ).add_to(m)
 
 st_folium(m, width=1200, height=700)
