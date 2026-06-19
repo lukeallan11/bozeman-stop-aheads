@@ -5,6 +5,11 @@ from streamlit_folium import st_folium
 import re
 import gpxpy
 from geopy.distance import geodesic
+import streamlit as st
+import pandas as pd
+import folium
+import xml.etree.ElementTree as ET
+from io import BytesIO
 
 st.set_page_config(layout="wide")
 
@@ -247,6 +252,39 @@ if uploaded_gpx is not None:
         st.info("No stop aheads matched this route. Try increasing the match distance.")
     else:
         st.dataframe(matched_df)
+
+        gpx = ET.Element(
+            "gpx",
+            version="1.1",
+            creator="Bozeman Stop Aheads"
+        )
+
+        for _, row in matched_df.iterrows():
+            wpt = ET.SubElement(
+                gpx,
+                "wpt",
+                lat=str(row["lat"]),
+                lon=str(row["lon"])
+            )
+
+            name = ET.SubElement(wpt, "name")
+            name.text = str(row["name"])
+
+            desc = ET.SubElement(wpt, "desc")
+            desc.text = f"Stop Ahead - {row['distance_along_route_km']} km / {row['distance_along_route_mi']} mi"
+
+        xml_bytes = ET.tostring(
+            gpx,
+            encoding="utf-8",
+            xml_declaration=True
+        )
+
+        st.download_button(
+            label="Download Garmin Waypoints GPX",
+            data=xml_bytes,
+            file_name="stop_aheads_waypoints.gpx",
+            mime="application/gpx+xml"
+        )
 
 st.subheader("Full Stop Ahead Database")
 st.dataframe(df_valid)
