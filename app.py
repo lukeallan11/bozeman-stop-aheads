@@ -223,7 +223,6 @@ max_distance_m = st.sidebar.slider(
 )
 
 st.sidebar.caption(f"{max_distance_m} meters")
-
 st.sidebar.metric("Known stop aheads", len(df_valid))
 
 route_points = None
@@ -249,6 +248,18 @@ if uploaded_gpx is not None:
                 f"{row['distance_along_route_km']} km / "
                 f"{row['distance_along_route_mi']} mi"
             )
+
+        garmin_course_gpx = make_garmin_course_gpx(route_points, matched_df)
+
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Garmin Export")
+
+        st.sidebar.download_button(
+            label="📥 Export Garmin Course",
+            data=garmin_course_gpx,
+            file_name="bozeman_stop_ahead_course.gpx",
+            mime="application/gpx+xml",
+        )
 
 if route_points:
     map_start = route_points[0]
@@ -315,19 +326,6 @@ if uploaded_gpx is not None:
         st.info("No stop aheads matched this route. Try increasing the match distance.")
     else:
         st.dataframe(matched_df)
-
-        garmin_course_gpx = make_garmin_course_gpx(route_points, matched_df)
-
-	st.sidebar.markdown("---")
-	
-	st.sidebar.subheader("Garmin Export")
-	
-        st.sidebar.download_button(
-    label="📥 Export Garmin Course",
-    data=garmin_course_gpx,
-    file_name="bozeman_stop_ahead_course.gpx",
-    mime="application/gpx+xml",
-)
 
 st.subheader("Full Stop Ahead Database")
 st.dataframe(df_valid)
