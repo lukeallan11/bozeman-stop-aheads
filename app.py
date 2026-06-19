@@ -113,19 +113,28 @@ def find_nearby_signs(df_signs, route_points, max_distance_m):
     return pd.DataFrame(matches).sort_values("distance_along_route_km")
 
 
-def make_waypoints_gpx(matched_df):
+def make_garmin_course_gpx(route_points, matched_df):
     gpx = ET.Element(
         "gpx",
-        version="1.1",
-        creator="Bozeman Stop Aheads"
+        {
+            "version": "1.1",
+            "creator": "Bozeman Stop Aheads",
+            "xmlns": "http://www.topografix.com/GPX/1/1",
+        }
     )
+
+    metadata = ET.SubElement(gpx, "metadata")
+    metadata_name = ET.SubElement(metadata, "name")
+    metadata_name.text = "Bozeman Stop Ahead Course"
 
     for _, row in matched_df.iterrows():
         wpt = ET.SubElement(
             gpx,
             "wpt",
-            lat=str(row["lat"]),
-            lon=str(row["lon"])
+            {
+                "lat": str(row["lat"]),
+                "lon": str(row["lon"]),
+            }
         )
 
         name = ET.SubElement(wpt, "name")
@@ -137,8 +146,27 @@ def make_waypoints_gpx(matched_df):
             f"{row['distance_along_route_mi']} mi"
         )
 
-        symbol = ET.SubElement(wpt, "sym")
-        symbol.text = "Flag"
+        sym = ET.SubElement(wpt, "sym")
+        sym.text = "Flag"
+
+        typ = ET.SubElement(wpt, "type")
+        typ.text = "Stop Ahead"
+
+    trk = ET.SubElement(gpx, "trk")
+    trk_name = ET.SubElement(trk, "name")
+    trk_name.text = "Bozeman Stop Ahead Course"
+
+    trkseg = ET.SubElement(trk, "trkseg")
+
+    for lat, lon in route_points:
+        ET.SubElement(
+            trkseg,
+            "trkpt",
+            {
+                "lat": str(lat),
+                "lon": str(lon),
+            }
+        )
 
     return ET.tostring(
         gpx,
@@ -286,12 +314,12 @@ if uploaded_gpx is not None:
     else:
         st.dataframe(matched_df)
 
-        waypoints_gpx = make_waypoints_gpx(matched_df)
+        garmin_course_gpx = make_garmin_course_gpx(route_points, matched_df)
 
         st.download_button(
-            label="Download Garmin Waypoints GPX",
-            data=waypoints_gpx,
-            file_name="stop_aheads_waypoints.gpx",
+            label="Download Garmin Course GPX",
+            data=garmin_course_gpx,
+            file_name="bozeman_stop_ahead_course.gpx",
             mime="application/gpx+xml",
         )
 
