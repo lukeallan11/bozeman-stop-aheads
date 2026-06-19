@@ -21,7 +21,9 @@ def extract_lat_lon(url):
 
     return None, None
 
-df = pd.read_csv("signs.csv")
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDDqZ0Qu0WLj0va46qBEvMQvh39mCNHf8q2QU1U52cl1sgMP-ugF_PokPcrNfks5KsEOGW8Hx4yRS/pub?gid=0&single=true&output=csv"
+
+df = pd.read_csv(SHEET_URL)
 
 if "maps_url" not in df.columns:
     st.error("Your signs.csv must have a column named maps_url.")
