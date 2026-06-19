@@ -91,7 +91,7 @@ def find_nearby_signs(df_signs, route_points, max_distance_m):
 
 @st.cache_data(ttl=60)
 def load_signs():
-    df = pd.read_csv(SHEET_URL)
+    df = pd.read_csv(SHEET_URL, engine="python", on_bad_lines="skip")
 
     if "maps_url" not in df.columns:
         st.error("Your Google Sheet must have a column named maps_url.")
